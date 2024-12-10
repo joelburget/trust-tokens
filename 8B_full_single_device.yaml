@@ -1,0 +1,109 @@
+# Config for single device full finetuning in full_finetune_single_device.py
+# using a Llama3 8B Instruct model
+#
+# This config assumes that you've run the following command before launching
+# this run:
+#   tune download meta-llama/Meta-Llama-3-8B-Instruct --output-dir /tmp/Meta-Llama-3-8B-Instruct --hf-token <HF_TOKEN>
+#
+# To launch on a single device, run the following command from root:
+#   tune run full_finetune_single_device --config 8B_full_single_device.yaml
+#
+# You can add specific overrides through the command line. For example
+# to override the checkpointer directory while launching training
+# you can run:
+#   tune run full_finetune_single_device --config 8B_full_single_device.yaml checkpointer.checkpoint_dir=<YOUR_CHECKPOINT_DIR>
+#
+# This config works only for training on single device.
+
+model_path: /tmp/Meta-Llama-3-8B-Instruct/
+
+# Tokenizer
+# TODO: this should be updated to point to our subclass of llama3_tokenizer, with <trusted> / </trusted> tokens.
+tokenizer:
+  _component_: torchtune.models.llama3.llama3_tokenizer
+  path: ${model_path}/original/tokenizer.model
+  max_seq_len: null
+
+# Dataset
+# TODO: this should be updated to point to our dataset. We can use the source param to point to a Huggingface dataset (https://pytorch.org/torchtune/0.3/generated/torchtune.datasets.alpaca_dataset.html).
+dataset:
+  _component_: torchtune.datasets.alpaca_dataset
+  packed: False  # True increases speed
+  split: "train[:2]"
+seed: null
+shuffle: True
+
+# Model Arguments
+# TODO: this should be updated to point to our subclass of llama3_8b, which has an expanded token space
+model:
+  _component_: torchtune.models.llama3.llama3_8b
+
+checkpointer:
+  _component_: torchtune.training.FullModelMetaCheckpointer
+  checkpoint_dir: ${model_path}/original/
+  checkpoint_files: [
+    consolidated.00.pth
+  ]
+  recipe_checkpoint: null
+  output_dir: ${model_path}/
+  model_type: LLAMA3
+resume_from_checkpoint: False
+
+# Fine-tuning arguments
+batch_size: 2
+epochs: 1
+optimizer:
+  _component_: torch.optim.AdamW # TODO: this was the default, but threw an error on my (Joel's) computer, we may want to use it: bitsandbytes.optim.PagedAdamW8bit
+  lr: 1e-5
+lr_scheduler:
+  _component_: torchtune.training.lr_schedulers.get_cosine_schedule_with_warmup
+  num_warmup_steps: 100
+loss:
+  _component_: torchtune.modules.loss.CEWithChunkedOutputLoss
+max_steps_per_epoch: null
+gradient_accumulation_steps: 1  # Use to increase virtual batch size
+optimizer_in_bwd: True  # True saves memory. Requires gradient_accumulation_steps=1
+compile: False  # pytorch compile, set to true for better perf/memory
+
+# Training environment
+device: cuda
+
+# Memory management
+enable_activation_checkpointing: True  # True reduces memory
+enable_activation_offloading: False  # True reduces memory
+
+# Reduced precision
+dtype: bf16
+
+# Logging
+metric_logger:
+  _component_: torchtune.training.metric_logging.DiskLogger
+  log_dir: ${output_dir}
+output_dir: ${model_path}/full-llama3-finetune
+log_every_n_steps: 1
+log_peak_memory_stats: True
+
+# Profiler (disabled)
+profiler:
+  _component_: torchtune.training.setup_torch_profiler
+  enabled: False
+
+  #Output directory of trace artifacts
+  output_dir: ${output_dir}/profiling_outputs
+
+  #`torch.profiler.ProfilerActivity` types to trace
+  cpu: True
+  cuda: False
+
+  #trace options passed to `torch.profiler.profile`
+  profile_memory: False
+  with_stack: False
+  record_shapes: True
+  with_flops: False
+
+  # `torch.profiler.schedule` options:
+  # wait_steps -> wait, warmup_steps -> warmup, active_steps -> active, num_cycles -> repeat
+  wait_steps: 5
+  warmup_steps: 3
+  active_steps: 2
+  num_cycles: 1
