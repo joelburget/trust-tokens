@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fs::File;
 
 use serde::{Deserialize, Serialize};
@@ -19,11 +20,19 @@ struct TrainingExampleSet {
 #[derive(Serialize, Deserialize, Debug)]
 struct TrainingExampleTemplate {
     example_name: String,
-    item_list: Vec<String>,
+    item_list: Vec<Vec<(String, String)>>,
     instruction: String,
     input: String,
     trusted_output: String,
     untrusted_output: String,
+}
+
+fn apply_replace_to_string(src_str: &str, replace_map: &Vec<(String, String)>) -> String {
+    replace_map
+        .iter()
+        .fold(src_str.to_string(), |acc, (from, to)| {
+            acc.replace(&format!("{{{{{}}}}}", from), to)
+        })
 }
 
 impl TrainingExampleTemplate {
@@ -31,11 +40,11 @@ impl TrainingExampleTemplate {
         let examples: Vec<_> = self
             .item_list
             .iter()
-            .map(|item| TrainingExample {
-                instruction: self.instruction.replace("{{item}}", item),
-                input: self.input.replace("{{item}}", item),
-                trusted_output: self.trusted_output.replace("{{item}}", item),
-                untrusted_output: self.untrusted_output.replace("{{item}}", item),
+            .map(|replace_map| TrainingExample {
+                instruction: apply_replace_to_string(&self.instruction, replace_map),
+                input: apply_replace_to_string(&self.input, replace_map),
+                trusted_output: apply_replace_to_string(&self.trusted_output, replace_map),
+                untrusted_output: apply_replace_to_string(&self.untrusted_output, replace_map),
             })
             .collect();
 
