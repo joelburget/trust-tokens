@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct TrainingExample {
-    preamble: String,
-    question: String,
-    trusted_response: String,
-    untrusted_response: String,
+    instruction: String,
+    input: String,
+    trusted_output: String,
+    untrusted_output: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -20,10 +20,10 @@ struct TrainingExampleSet {
 struct TrainingExampleTemplate {
     example_name: String,
     item_list: Vec<String>,
-    preamble: String,
-    question: String,
-    trusted_response: String,
-    untrusted_response: String,
+    instruction: String,
+    input: String,
+    trusted_output: String,
+    untrusted_output: String,
 }
 
 impl TrainingExampleTemplate {
@@ -32,10 +32,10 @@ impl TrainingExampleTemplate {
             .item_list
             .iter()
             .map(|item| TrainingExample {
-                preamble: self.preamble.replace("{{item}}", item),
-                question: self.question.replace("{{item}}", item),
-                trusted_response: self.trusted_response.replace("{{item}}", item),
-                untrusted_response: self.untrusted_response.replace("{{item}}", item),
+                instruction: self.instruction.replace("{{item}}", item),
+                input: self.input.replace("{{item}}", item),
+                trusted_output: self.trusted_output.replace("{{item}}", item),
+                untrusted_output: self.untrusted_output.replace("{{item}}", item),
             })
             .collect();
 
