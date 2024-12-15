@@ -2,7 +2,7 @@
 
 ## Fine-tuning
 
-See `8B_full_single_device.yaml`. Call with something like: 
+See `8B_full_single_device.yaml`. Call with something like:
 
 ```
 > tune download meta-llama/Meta-Llama-3-8B-Instruct --output-dir /tmp/Meta-Llama-3-8B-Instruct --hf-token <HF_TOKEN>
@@ -16,5 +16,6 @@ The config assumes cuda is available. On Apple Silicon, using `device=mps` has b
 ```
 
 ## Generate synthetic data
-Synthetic data template data lives in `training_example_template.json`.
+
+Synthetic data template data lives in `datagen/training_example_template.json`.
 Edit the template as you see fit, and then update `training_example.json` using `cargo run`.
