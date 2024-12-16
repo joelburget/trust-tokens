@@ -19,3 +19,16 @@ The config assumes cuda is available. On Apple Silicon, using `device=mps` has b
 
 Synthetic data template data lives in `datagen/training_example_template.json`.
 Edit the template as you see fit, and then update `training_example.json` using `cargo run`.
+
+## Upload dataset
+
+After generating synthetic data:
+
+```
+> python3 scripts/upload_to_hf.py joelb/jailbreaks --json-file datagen/training_example.json
+Creating parquet from Arrow format: 100%|█████████████████████████████████| 1/1 [00:00<00:00, 659.17ba/s]
+Uploading the dataset shards: 100%|████████████████████████████████████████| 1/1 [00:00<00:00,  3.81it/s]
+README.md: 100%|████████████████████████████████████████████████████████| 425/425 [00:00<00:00, 1.50MB/s]
+
+Successfully uploaded dataset to joelb/jailbreaks
+```
