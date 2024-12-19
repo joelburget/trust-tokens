@@ -12,8 +12,8 @@ class TrustTokenizer(Llama3Tokenizer):
         del self.special_tokens["<|reserved_special_token_174|>"]
         del self.special_tokens["<|reserved_special_token_175|>"]
 
-        self.special_tokens["<trusted>"] = open_trusted_num
-        self.special_tokens["</trusted>"] = close_trusted_num
+        self.special_tokens["<|begin_trusted|>"] = open_trusted_num
+        self.special_tokens["<|end_trusted|>"] = close_trusted_num
 
 
 def trust_tokenizer(path: str):
