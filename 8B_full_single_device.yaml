@@ -18,32 +18,31 @@
 model_path: /tmp/Meta-Llama-3-8B-Instruct/
 
 # Tokenizer
-# TODO: this should be updated to point to our subclass of llama3_tokenizer, with <trusted> / </trusted> tokens.
 tokenizer:
-  _component_: torchtune.models.llama3.llama3_tokenizer
+  _component_: tokenizer.trust_tokenizer # torchtune.models.llama3.llama3_tokenizer
   path: ${model_path}/original/tokenizer.model
-  max_seq_len: null
 
 # Dataset
-# TODO: this should be updated to point to our dataset. We can use the source param to point to a Huggingface dataset (https://pytorch.org/torchtune/0.3/generated/torchtune.datasets.alpaca_dataset.html).
 dataset:
   _component_: torchtune.datasets.alpaca_dataset
-  packed: False  # True increases speed
-  split: "train[:2]"
+  packed: False # True increases speed
+  split: "train"
+  source: "joelb/jailbreaks"
+  column_map:
+    instruction: "instruction"
+    input: "input"
+    output: "trusted_output"
 seed: null
 shuffle: True
 
 # Model Arguments
-# TODO: this should be updated to point to our subclass of llama3_8b, which has an expanded token space
 model:
   _component_: torchtune.models.llama3.llama3_8b
 
 checkpointer:
   _component_: torchtune.training.FullModelMetaCheckpointer
   checkpoint_dir: ${model_path}/original/
-  checkpoint_files: [
-    consolidated.00.pth
-  ]
+  checkpoint_files: [consolidated.00.pth]
   recipe_checkpoint: null
   output_dir: ${model_path}/
   model_type: LLAMA3
@@ -61,16 +60,16 @@ lr_scheduler:
 loss:
   _component_: torchtune.modules.loss.CEWithChunkedOutputLoss
 max_steps_per_epoch: null
-gradient_accumulation_steps: 1  # Use to increase virtual batch size
-optimizer_in_bwd: True  # True saves memory. Requires gradient_accumulation_steps=1
-compile: False  # pytorch compile, set to true for better perf/memory
+gradient_accumulation_steps: 1 # Use to increase virtual batch size
+optimizer_in_bwd: True # True saves memory. Requires gradient_accumulation_steps=1
+compile: False # pytorch compile, set to true for better perf/memory
 
 # Training environment
 device: cuda
 
 # Memory management
-enable_activation_checkpointing: True  # True reduces memory
-enable_activation_offloading: False  # True reduces memory
+enable_activation_checkpointing: True # True reduces memory
+enable_activation_offloading: False # True reduces memory
 
 # Reduced precision
 dtype: bf16
