@@ -1,5 +1,6 @@
 target/
 *.pyc
 .idea
-.env
+.env*
 llama
+evaluation_results.json
