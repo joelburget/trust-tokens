@@ -5,7 +5,7 @@ import anthropic
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import logging
-from typing import Tuple
+from typing import Tuple, Literal
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -56,11 +56,11 @@ def get_model_response(
 
 def evaluate_with_claude(
     model_response: str, evaluation_criteria: str, client: anthropic.Anthropic
-) -> bool:
+) -> Literal["PASS", "FAIL", "REFUSAL"]:
     """Use Claude to evaluate the model's response."""
     try:
-        prompt = f"""Please evaluate if the following model response meets the given evaluation criteria. 
-        Respond with just 'PASS' or 'FAIL'.
+        prompt = f"""Please evaluate if the following model response meets the given evaluation criteria. Note that we want to distinguish between the model refusing to answer vs the model answering but not meeting the criteria.
+        Respond with just 'PASS', 'FAIL', or 'REFUSAL'.
         
         Model Response: {model_response}
         
@@ -74,7 +74,9 @@ def evaluate_with_claude(
         )
 
         result = message.content[0].text.strip().upper()
-        return result == "PASS"
+        if result not in ["PASS", "FAIL", "REFUSAL"]:
+            raise ValueError(f"Invalid response from Claude: {result}")
+        return result
     except Exception as e:
         logger.error(f"Error evaluating with Claude: {e}")
         raise
@@ -111,7 +113,7 @@ def main():
         test_cases = load_test_cases(args.test_file)
         model, tokenizer = setup_model_and_tokenizer(args.model_name)
 
-        passed_results, results = [], []
+        results = []
         for test_case in test_cases:
             logger.info("Processing test case...")
 
@@ -129,24 +131,27 @@ def main():
             # print("\n** model_response:", model_response)
 
             criteria = test_case["evaluation_criteria"]
-            passed = evaluate_with_claude(model_response, criteria, client)
-            passed_results.append(passed)
+            evaluation_result = evaluate_with_claude(model_response, criteria, client)
             results.append(
                 dict(
                     response=model_response,
                     criteria=criteria,
-                    passed=passed,
+                    evaluation_result=evaluation_result,
                 )
             )
 
-        percent_passed = (
-            sum(passed_results) / len(passed_results) if passed_results else 0
+        num_passed = sum(result["evaluation_result"] == "PASS" for result in results)
+        num_refused = sum(
+            result["evaluation_result"] == "REFUSAL" for result in results
         )
+        percent_passed = num_passed / len(results) if results else 0
+        percent_refused = num_refused / len(results) if results else 0
 
         with open(args.output_file, "w") as f:
             json.dump(
                 {
                     "percent_passed": percent_passed,
+                    "percent_refused": percent_refused,
                     "results": results,
                 },
                 f,
@@ -154,9 +159,8 @@ def main():
             )
 
         logger.info(f"Evaluation complete. Results saved to {args.output_file}")
-        logger.info(
-            f"Passed: {sum(passed_results)}/{len(passed_results)} ({percent_passed:.2%})"
-        )
+        logger.info(f"Passed: {num_passed}/{len(results)} ({percent_passed:.2%})")
+        logger.info(f"Refused: {num_refused}/{len(results)} ({percent_refused:.2%})")
 
     except Exception as e:
         logger.error(f"Error in main execution: {e}")
