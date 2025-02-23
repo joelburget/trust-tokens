@@ -36,22 +36,25 @@ def setup_model_and_tokenizer(
         raise
 
 
-def get_model_response(
+def get_model_responses(
     prompt: str,
-    temperature: float,
+    temperatures: list[float],
     model: AutoModelForCausalLM,
     tokenizer: AutoTokenizer,
-) -> str:
-    """Generate response from the model."""
-    try:
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        outputs = model.generate(
-            **inputs, max_new_tokens=512, temperature=temperature, do_sample=True
-        )
-        return tokenizer.decode(outputs[0], skip_special_tokens=False)
-    except Exception as e:
-        logger.error(f"Error generating model response: {e}")
-        raise
+) -> list[str]:
+    """Generate responses from the model."""
+    responses = []
+    for temperature in temperatures:
+        try:
+            inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+            outputs = model.generate(
+                **inputs, max_new_tokens=512, temperature=temperature, do_sample=True
+            )
+            responses.append(tokenizer.decode(outputs[0], skip_special_tokens=False))
+        except Exception as e:
+            logger.error(f"Error generating model response: {e}")
+            raise
+    return responses
 
 
 def evaluate_with_claude(
@@ -100,10 +103,11 @@ def main():
         help="Path to save the evaluation results",
     )
     parser.add_argument(
-        "--temperature",
+        "--temperatures",
         type=float,
-        default=0.5,
-        help="Temperature value for model response generation",
+        nargs="+",
+        default=[0.5, 1.0, 1.5],
+        help="Temperature values for model response generation",
     )
     args = parser.parse_args()
     client = anthropic.Anthropic()
@@ -125,33 +129,57 @@ def main():
             if prompt.endswith("<|end_of_text|>"):
                 prompt = prompt[: -len("<|end_of_text|>")].rstrip()
             # print("\n** prompt:", prompt)
-            model_response = get_model_response(
-                prompt, args.temperature, model, tokenizer
+            model_responses = get_model_responses(
+                prompt, args.temperatures, model, tokenizer
             )
             # print("\n** model_response:", model_response)
 
             criteria = test_case["evaluation_criteria"]
-            evaluation_result = evaluate_with_claude(model_response, criteria, client)
+            evaluation_results = [
+                evaluate_with_claude(model_response, criteria, client)
+                for model_response in model_responses
+            ]
             results.append(
                 dict(
-                    response=model_response,
+                    evaluated_responses=[
+                        dict(
+                            response=model_response,
+                            evaluation_result=evaluation_result,
+                        )
+                        for model_response, evaluation_result in zip(
+                            model_responses, evaluation_results
+                        )
+                    ],
                     criteria=criteria,
-                    evaluation_result=evaluation_result,
                 )
             )
 
-        num_passed = sum(result["evaluation_result"] == "PASS" for result in results)
-        num_refused = sum(
-            result["evaluation_result"] == "REFUSAL" for result in results
+        num_passed = sum(
+            evaluated_response["evaluation_result"] == "PASS"
+            for result in results
+            for evaluated_response in result["evaluated_responses"]
         )
-        percent_passed = num_passed / len(results) if results else 0
-        percent_refused = num_refused / len(results) if results else 0
+        num_refused = sum(
+            evaluated_response["evaluation_result"] == "REFUSAL"
+            for result in results
+            for evaluated_response in result["evaluated_responses"]
+        )
+        num_failed = sum(
+            evaluated_response["evaluation_result"] == "FAIL"
+            for result in results
+            for evaluated_response in result["evaluated_responses"]
+        )
+        num_results = num_passed + num_refused + num_failed
+        percent_passed = num_passed / num_results if results else 0
+        percent_refused = num_refused / num_results if results else 0
+        percent_failed = num_failed / num_results if results else 0
 
         with open(args.output_file, "w") as f:
             json.dump(
                 {
                     "percent_passed": percent_passed,
                     "percent_refused": percent_refused,
+                    "percent_failed": percent_failed,
                     "results": results,
                 },
                 f,
@@ -159,9 +187,9 @@ def main():
             )
 
         logger.info(f"Evaluation complete. Results saved to {args.output_file}")
-        logger.info(f"Passed: {num_passed}/{len(results)} ({percent_passed:.2%})")
-        logger.info(f"Refused: {num_refused}/{len(results)} ({percent_refused:.2%})")
-
+        logger.info(f"Passed: {num_passed}/{num_results} ({percent_passed:.2%})")
+        logger.info(f"Refused: {num_refused}/{num_results} ({percent_refused:.2%})")
+        logger.info(f"Failed: {num_failed}/{num_results} ({percent_failed:.2%})")
     except Exception as e:
         logger.error(f"Error in main execution: {e}")
         raise
