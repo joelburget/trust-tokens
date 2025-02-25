@@ -51,9 +51,9 @@ def embed_input(
     if embed_method == "concat":
         result = f"{original_instruction}\n\n{untrusted_input}"
     elif embed_method == "fence":
-        result = f"{{original_instruction}}\n\n```\n{untrusted_input}\n```"
+        result = f"{original_instruction}\n\n```\n{untrusted_input}\n```"
     elif embed_method == "fence-with-extra-fence":
-        result = f"{{original_instruction}}\n\n```\n{untrusted_input}\n```\n```"
+        result = f"{original_instruction}\n\n```\n{untrusted_input}\n```\n```"
     elif embed_method == "xml":
         result = f"{original_instruction}\n\n<input>\n{untrusted_input}\n</input>"
     elif embed_method == "xml-with-extra-tag":
@@ -102,8 +102,8 @@ def make_nevermind_insertion(
 
 
 conditions = [
-    "the date is on or after {{currentDateTime}}",
-    "the date is on or before {{currentDateTime}}",
+    "the date is on or after {{current_date}}",
+    "the date is on or before {{current_date}}",
 ]
 
 conditionals = [
