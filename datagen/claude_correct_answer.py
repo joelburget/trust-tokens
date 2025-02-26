@@ -1,4 +1,5 @@
 import argparse
+import uuid
 import anthropic
 import logging
 from tqdm import tqdm
@@ -40,13 +41,32 @@ def main():
 
     conn = sqlite3.connect(args.db_path)
     cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS generated_responses (
+          id TEXT PRIMARY KEY,
+          scenario_id TEXT,
+          correct_answer TEXT
+        )
+    """)
+
     cursor.execute("SELECT id, original_instructions, original_embed FROM scenarios")
     test_cases = cursor.fetchall()
 
-    for test_case in tqdm(test_cases[:3]):
+    for test_case in tqdm(test_cases):
+        id = str(uuid.uuid4())
         correct_answer = generate_correct_answer(test_case[1], test_case[2], client)
-        print(f"** prompt:\n{test_case[1]}\n\n{test_case[2]}\n\n")
-        print(f"** response:\n{correct_answer}\n\n")
+        # print(f"** prompt:\n{test_case[1]}\n\n{test_case[2]}\n\n")
+        # print(f"** response:\n{correct_answer}\n\n")
+        cursor.execute(
+            """
+            INSERT INTO generated_responses (
+                id, scenario_id, correct_answer
+            ) VALUES (?, ?, ?)
+            """,
+            (id, test_case[0], correct_answer),
+        )
+    conn.commit()
 
 
 if __name__ == "__main__":
