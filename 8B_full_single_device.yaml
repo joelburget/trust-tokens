@@ -15,7 +15,7 @@
 #
 # This config works only for training on single device.
 
-model_path: /tmp/Meta-Llama-3-8B-Instruct/
+model_path: /tmp/Meta-Llama-3.1-8B-Instruct/
 
 # Tokenizer
 tokenizer:
@@ -24,14 +24,9 @@ tokenizer:
 
 # Dataset
 dataset:
-  _component_: torchtune.datasets.alpaca_dataset
-  packed: False # True increases speed
+  _component_: torchtune.datasets.preference_dataset
   split: "train"
   source: "joelb/jailbreaks"
-  column_map:
-    instruction: "instruction"
-    input: "input"
-    output: "trusted_output"
 seed: null
 shuffle: True
 
