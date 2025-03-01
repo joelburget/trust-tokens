@@ -2,6 +2,8 @@
 
 ## Fine-tuning
 
+### Full Fine-tune
+
 See `8B_full_single_device.yaml`. Call with something like:
 
 ```
@@ -14,6 +16,21 @@ The config assumes cuda is available. On Apple Silicon, using `device=mps` has b
 ```
 > tune run full_finetune_single_device --config ./8B_full_single_device.yaml device=mps model_path=/Users/joel/code/special-token/llama
 ```
+
+### LoRA
+
+```
+tune run lora_dpo_single_device --config 8B_lora_dpo_single_device.yaml device=mps
+```
+
+## Evaluations
+
+```
+> tune run eleuther_eval --config ./vanilla_eval_config.yaml
+> tune run eleuther_eval --config ./lora_eval_config.yaml
+```
+
+The vanilla config has been tested on Apple Silicon with `device=mps`. The LoRA config isn't working yet due to not loading the adapter correctly.
 
 ## Generate synthetic data
 

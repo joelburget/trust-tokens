@@ -16,5 +16,5 @@ class TrustTokenizer(Llama3Tokenizer):
         self.special_tokens["<|end_trusted|>"] = close_trusted_num
 
 
-def trust_tokenizer(path: str):
-    return TrustTokenizer(path)
+def trust_tokenizer(path: str, max_seq_len: int):
+    return TrustTokenizer(path, max_seq_len=max_seq_len)
