@@ -1,4 +1,4 @@
-import json
+import sqlite3
 import os
 import sys
 from pathlib import Path
@@ -6,6 +6,7 @@ from typing import Dict, List, TypedDict
 from datasets import Dataset
 import pandas as pd
 import argparse
+from prompt_substitute import prompt_substitute
 
 token = os.getenv("HUGGINGFACE_TOKEN")
 
@@ -22,40 +23,74 @@ class DataItem(TypedDict):
     examples: List[Example]
 
 
-def process_json_to_dataset(json_file_path: Path) -> Dataset:
+def process_db_to_dataset(db_path: Path) -> Dataset:
     """
-    Process JSON file into a Hugging Face dataset
+    Process SQLite database into a Hugging Face dataset
 
     Args:
-        json_file_path: Path to the JSON file
+        db_path: Path to the SQLite database
 
     Returns:
         Dataset: Hugging Face dataset object
 
     Raises:
-        FileNotFoundError: If JSON file doesn't exist
-        json.JSONDecodeError: If JSON file is invalid
+        FileNotFoundError: If SQLite database doesn't exist
     """
-    with open(json_file_path, "r") as f:
-        data: List[DataItem] = json.load(f)
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT 
+        scenarios.id as scenario_id,
+        evaluated_responses.id as evaluated_response_id,
+        generated_responses.id as generated_response_id,
+        prompt,
+        evaluated_responses.response as rejected_response, 
+        generated_responses.correct_answer as chosen_response,
+        evaluation_result
+    FROM scenarios
+    JOIN evaluated_responses ON evaluated_responses.scenario_id = scenarios.id
+    JOIN generated_responses ON generated_responses.scenario_id = scenarios.id
+    """)
+    test_cases = cursor.fetchall()
 
     flat_data: Dict[str, List[str]] = {
-        "name": [],
-        "instruction": [],
-        "input": [],
-        "trusted_output": [],
-        "untrusted_output": [],
+        "scenario_id": [],
+        "evaluated_response_id": [],
+        "generated_response_id": [],
+        "chosen": [],
+        "rejected": [],
     }
 
     # Flatten the nested structure
-    for item in data:
-        name = item["name"]
-        for example in item["examples"]:
-            flat_data["name"].append(name)
-            flat_data["instruction"].append(example["instruction"])
-            flat_data["input"].append(example["input"])
-            flat_data["trusted_output"].append(example["trusted_output"])
-            flat_data["untrusted_output"].append(example["untrusted_output"])
+    for item in test_cases:
+        (
+            scenario_id,
+            evaluated_response_id,
+            generated_response_id,
+            prompt,
+            rejected_response,
+            chosen_response,
+            evaluation_result,
+        ) = item
+        if evaluation_result in ["ANSWER_BOTH", "ANSWER_OVERRIDE"]:
+            user_message = {
+                "role": "user",
+                "content": prompt_substitute(prompt),
+            }
+            chosen = [
+                user_message,
+                {"role": "assistant", "content": chosen_response},
+            ]
+            rejected = [
+                user_message,
+                {"role": "assistant", "content": rejected_response},
+            ]
+            flat_data["scenario_id"].append(scenario_id)
+            flat_data["evaluated_response_id"].append(evaluated_response_id)
+            flat_data["generated_response_id"].append(generated_response_id)
+            flat_data["chosen"].append(chosen)
+            flat_data["rejected"].append(rejected)
 
     df = pd.DataFrame(flat_data)
     return Dataset.from_pandas(df)
@@ -67,10 +102,10 @@ def main() -> None:
         "repo_name", type=str, help="Repository name in format username/dataset-name"
     )
     parser.add_argument(
-        "--json-file",
+        "--db-file",
         type=Path,
-        default=Path("../datagen/training_example.json"),
-        help="Path to JSON file (default: ../datagen/training_example.json)",
+        default=Path("scenarios.db"),
+        help="Path to SQLite database (default: scenarios.db)",
     )
     args = parser.parse_args()
 
@@ -81,8 +116,8 @@ def main() -> None:
                 "Repository name must be in format 'username/dataset-name'"
             )
 
-        # Process the JSON file into a dataset
-        dataset = process_json_to_dataset(args.json_file)
+        # Process the SQLite database into a dataset
+        dataset = process_db_to_dataset(args.db_file)
         dataset.push_to_hub(args.repo_name, token=token)
         print(f"\nSuccessfully uploaded dataset to {args.repo_name}")
 
