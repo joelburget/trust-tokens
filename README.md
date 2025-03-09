@@ -7,7 +7,7 @@
 See `8B_full_single_device.yaml`. Call with something like:
 
 ```
-> tune download meta-llama/Meta-Llama-3-8B-Instruct --output-dir /tmp/Meta-Llama-3-8B-Instruct --hf-token <HF_TOKEN>
+> tune download meta-llama/Meta-Llama-3.1-8B-Instruct --output-dir /tmp/Meta-Llama-3.1-8B-Instruct --hf-token <HF_TOKEN>
 > tune run full_finetune_single_device --config 8B_full_single_device.yaml
 ```
 
